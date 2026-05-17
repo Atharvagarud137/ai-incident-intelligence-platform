@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # LLM Provider — controls which AI backend is used
     llm_provider: str = Field(default="gemini")  # "gemini" or "ollama"
     gemini_api_key: str = Field(default="")
-    gemini_model: str = Field(default="gemini-1.5-flash")
+    gemini_model: str = Field(default="gemini-2.0-flash")
 
     # Ollama (local LLM fallback)
     ollama_base_url: str = Field(default="http://localhost:11434")
@@ -46,10 +46,11 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     log_file: str = Field(default="./logs/app.log")
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
 
 
 @lru_cache()

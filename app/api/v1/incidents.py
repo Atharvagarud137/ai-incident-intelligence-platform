@@ -18,6 +18,8 @@ from app.services.incident_service import (
     update_incident,
     delete_incident,
 )
+from app.services.chunking_service import chunk_logs
+from app.services.vector_store_service import store_chunks
 from app.core.logging import logger
 
 router = APIRouter(prefix="/incidents", tags=["Incidents"])
@@ -27,22 +29,32 @@ router = APIRouter(prefix="/incidents", tags=["Incidents"])
 def ingest_logs(payload: LogIngestRequest, db: Session = Depends(get_db)):
     """
     Primary log ingestion endpoint.
-    Accepts raw log content, creates an incident record, and prepares
-    it for the chunking and embedding pipeline.
+    Accepts raw log content, creates an incident record, chunks the logs,
+    generates embeddings, and stores them in ChromaDB for RAG retrieval.
     """
+    # Step 1 — persist the incident to PostgreSQL
     incident_data = IncidentCreate(
         title=payload.title,
         severity=payload.severity,
         raw_logs=payload.raw_logs,
     )
     incident = create_incident(db, incident_data)
-    logger.info(f"Logs ingested | incident_id={incident.id} | log_size={len(payload.raw_logs)} chars")
+
+    # Step 2 — chunk the raw logs
+    chunks = chunk_logs(payload.raw_logs, incident.id)
+
+    # Step 3 — embed and store chunks in ChromaDB
+    stored_count = store_chunks(chunks)
+
+    logger.info(
+        f"Ingest pipeline complete | incident_id={incident.id} | "
+        f"chunks={stored_count}"
+    )
 
     return LogIngestResponse(
         incident_id=incident.id,
-        message="Logs ingested successfully. Ready for processing.",
-        # Chunking pipeline will populate this — placeholder for now
-        chunks_created=0,
+        message="Logs ingested and processed successfully.",
+        chunks_created=stored_count,
     )
 
 

@@ -341,3 +341,126 @@ The goal is to build:
 - a production-style AI platform
 instead of
 - a monolithic experimental AI project.
+
+---
+
+---
+
+# Updates
+
+## Update 1 — Actual Folder Structure (2026-05-18)
+
+**Status:** Core structure implemented. Some planned directories revised.  
+**Last Updated:** 2026-05-18
+
+---
+
+### Actual Root Structure (as implemented)
+
+```text
+ai-incident-intelligence-platform/
+│
+├── app/                        # Core backend application
+├── alembic/                    # Database migration scripts
+├── docs/                       # Project documentation
+├── tests/                      # Test suite
+├── data/                       # Runtime data (ChromaDB persist dir) — not committed
+├── logs/                       # Application logs — not committed
+├── venv/                       # Python virtual environment — not committed
+├── main.py                     # FastAPI application entry point
+├── requirements.txt            # Python dependencies
+├── pytest.ini                  # Pytest configuration
+├── .env                        # Environment variables — not committed
+├── .env.example                # Environment variable template — committed
+├── .gitignore                  # Git exclusion rules
+└── README.md                   # Project overview
+```
+
+---
+
+### Actual app/ Structure (as implemented)
+
+```text
+app/
+│
+├── api/
+│   ├── __init__.py
+│   └── v1/
+│       ├── __init__.py
+│       └── incidents.py        # Incident CRUD + log ingest endpoint
+│
+├── core/
+│   ├── __init__.py
+│   ├── config.py               # Pydantic Settings — all env vars loaded here
+│   ├── database.py             # SQLAlchemy engine, session factory, health check
+│   ├── logging.py              # Loguru configuration
+│   └── providers/
+│       ├── __init__.py         # get_llm_provider() factory function
+│       ├── base.py             # BaseLLMProvider abstract interface
+│       ├── gemini_provider.py  # Gemini API implementation
+│       └── ollama_provider.py  # Ollama local LLM implementation
+│
+├── models/
+│   ├── __init__.py
+│   ├── base.py                 # DeclarativeBase + TimestampMixin
+│   └── incident.py             # Incident SQLAlchemy model
+│
+├── schemas/
+│   ├── __init__.py
+│   └── incident.py             # Pydantic request/response schemas
+│
+└── services/
+    ├── __init__.py
+    ├── chunking_service.py     # Log chunking (RecursiveCharacterTextSplitter)
+    ├── embedding_service.py    # Embedding generation (sentence-transformers)
+    ├── incident_service.py     # Incident CRUD business logic
+    └── vector_store_service.py # ChromaDB store/query/delete operations
+```
+
+---
+
+### Actual tests/ Structure (as implemented)
+
+```text
+tests/
+├── __init__.py
+└── test_core.py                # 25 unit tests covering config, providers, and endpoints
+```
+
+---
+
+### Actual alembic/ Structure (as implemented)
+
+```text
+alembic/
+├── env.py                      # Alembic environment — uses app settings for DB URL
+├── script.py.mako              # Migration script template
+├── README
+└── versions/
+    └── 830de44311a7_create_incidents_table.py   # Initial migration
+```
+
+---
+
+### Deviations from Original Plan
+
+| Original Plan | Actual Implementation | Reason |
+|---|---|---|
+| `app/models/` — Pydantic schemas | `app/models/` — SQLAlchemy ORM models only | Pydantic schemas moved to `app/schemas/` for cleaner separation |
+| `app/rag/` — RAG pipeline logic | Moved to `app/services/` | Services layer is sufficient for current pipeline complexity |
+| `app/utils/` | Not yet created | No shared utilities needed yet — will be added as needed |
+| `app/core/constants.py` | Not created | Constants managed via `config.py` settings |
+| `tests/api/`, `tests/rag/`, etc. | Single `tests/test_core.py` | Flat structure appropriate for current test count; will be split as tests grow |
+| `scripts/` | Not yet created | No automation scripts needed at this stage |
+
+---
+
+### New Directories Not in Original Plan
+
+| Directory | Purpose |
+|---|---|
+| `app/schemas/` | Pydantic request/response models (separated from SQLAlchemy models) |
+| `app/core/providers/` | LLM provider implementations (Strategy Pattern) |
+| `alembic/` | Database migration management |
+| `data/` | ChromaDB persistent storage (runtime, not committed) |
+| `logs/` | Application log files (runtime, not committed) |

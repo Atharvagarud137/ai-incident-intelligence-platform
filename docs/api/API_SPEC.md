@@ -375,3 +375,226 @@ The APIs follow:
 - service separation
 - scalable backend practices
 - maintainable API contracts
+
+---
+
+---
+
+# Updates
+
+## Update 1 — API Implementation (2026-05-18)
+
+**Status:** Core incident APIs implemented and live.  
+**Last Updated:** 2026-05-18
+
+---
+
+### Implemented Endpoints
+
+The following endpoints are live and tested. All are accessible via Swagger UI at `http://localhost:8000/docs`.
+
+---
+
+#### POST /api/v1/incidents/ingest
+
+Primary log ingestion endpoint. Replaces the planned `POST /api/v1/ingestion/upload`.
+
+**Request body:**
+
+```json
+{
+  "title": "High CPU usage on production server",
+  "severity": "high",
+  "raw_logs": "2026-05-18 10:00:01 ERROR CPU usage at 98%..."
+}
+```
+
+**Success response (201):**
+
+```json
+{
+  "incident_id": "b68cf463-ee90-424c-9ebe-acd7e033a68e",
+  "message": "Logs ingested and processed successfully.",
+  "chunks_created": 2
+}
+```
+
+**What happens internally:**
+1. Incident record created in PostgreSQL
+2. Raw logs chunked via `RecursiveCharacterTextSplitter`
+3. Chunks embedded via `all-MiniLM-L6-v2`
+4. Embeddings stored in ChromaDB with incident metadata
+
+---
+
+#### GET /api/v1/incidents/
+
+List all incidents with optional filtering and pagination.
+
+**Query parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| skip | int | No | 0 | Pagination offset |
+| limit | int | No | 50 | Max results (1–100) |
+| status | string | No | null | Filter by status (`open`, `investigating`, `resolved`, `closed`) |
+| severity | string | No | null | Filter by severity (`low`, `medium`, `high`, `critical`) |
+
+**Success response (200):** Array of incident objects.
+
+---
+
+#### GET /api/v1/incidents/{incident_id}
+
+Fetch a single incident by ID.
+
+**Success response (200):**
+
+```json
+{
+  "id": "b68cf463-ee90-424c-9ebe-acd7e033a68e",
+  "title": "High CPU usage on production server",
+  "description": null,
+  "severity": "high",
+  "status": "open",
+  "rca_summary": null,
+  "raw_logs": "...",
+  "created_at": "2026-05-18T09:20:23Z",
+  "updated_at": "2026-05-18T09:20:23Z"
+}
+```
+
+**Error response (404):**
+
+```json
+{
+  "detail": "Incident {incident_id} not found."
+}
+```
+
+---
+
+#### PATCH /api/v1/incidents/{incident_id}
+
+Partially update an incident. Only provided fields are updated.
+
+**Request body (all fields optional):**
+
+```json
+{
+  "status": "investigating",
+  "severity": "critical",
+  "rca_summary": "Root cause identified as memory leak in payment service."
+}
+```
+
+**Success response (200):** Updated incident object.
+
+---
+
+#### DELETE /api/v1/incidents/{incident_id}
+
+Permanently delete an incident.
+
+**Success response (204):** No content.
+
+**Error response (404):**
+
+```json
+{
+  "detail": "Incident {incident_id} not found."
+}
+```
+
+---
+
+#### GET /
+
+Root endpoint — returns platform metadata.
+
+**Success response (200):**
+
+```json
+{
+  "name": "AI Incident Intelligence Platform",
+  "version": "0.1.0",
+  "status": "running",
+  "environment": "development"
+}
+```
+
+---
+
+#### GET /health
+
+Health check endpoint.
+
+**Success response (200):**
+
+```json
+{
+  "status": "healthy"
+}
+```
+
+---
+
+### Data Models
+
+#### IncidentSeverity (enum)
+`low` | `medium` | `high` | `critical`
+
+#### IncidentStatus (enum)
+`open` | `investigating` | `resolved` | `closed`
+
+---
+
+### Validation
+
+All request bodies are validated using Pydantic v2. Invalid payloads return a `422 Unprocessable Entity` with field-level error details:
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "title"],
+      "msg": "String should have at least 3 characters",
+      "type": "string_too_short"
+    }
+  ]
+}
+```
+
+---
+
+### Deviations from Original Spec
+
+| Original Plan | Implemented |
+|---|---|
+| `POST /api/v1/ingestion/upload` (file upload) | `POST /api/v1/incidents/ingest` (JSON body with raw log text) |
+| `GET /api/v1/health` | `GET /health` (root level, not versioned) |
+| Response envelope `{"status": "success", ...}` | Direct object responses per FastAPI/OpenAPI conventions |
+
+File upload support (`multipart/form-data`) is planned for Phase 2.
+
+---
+
+### Swagger UI
+
+Full interactive API documentation is auto-generated and available at:
+
+```
+http://localhost:8000/docs
+```
+
+ReDoc documentation is also available at:
+
+```
+http://localhost:8000/redoc
+```
+
+OpenAPI JSON schema at:
+
+```
+http://localhost:8000/openapi.json
+```

@@ -232,3 +232,92 @@ No code changes required to switch providers — only `.env` changes.
 - [Ollama Official Site](https://ollama.com/)
 - [Ollama Model Library](https://ollama.com/library)
 - [Strategy Pattern — Refactoring Guru](https://refactoring.guru/design-patterns/strategy)
+
+---
+
+---
+
+# Updates
+
+## Update 1 — Implementation Complete (2026-05-18)
+
+**Status:** Decision implemented and operational.  
+**Last Updated:** 2026-05-18
+
+---
+
+### Decision Outcome
+
+The hybrid approach (Option C) was implemented as decided. The provider abstraction layer is live and working.
+
+---
+
+### Model Selection — Revised
+
+The original decision specified `gemini-1.5-flash` as the primary model. During implementation, this model was found to be unavailable on the free tier API version. The following models were tested:
+
+| Model | Result |
+|---|---|
+| `gemini-1.5-flash` | 404 — not found on API version v1beta |
+| `gemini-1.5-flash-latest` | 404 — not found |
+| `gemini-2.0-flash` | 429 — daily quota limit is 0 on free tier |
+| `gemini-2.0-flash-lite` | 429 — daily quota limit is 0 on free tier |
+| `gemini-2.5-flash` | ✅ Working — selected as active model |
+
+**Revised active model:** `gemini-2.5-flash`
+
+---
+
+### Implementation Details
+
+The abstraction layer was built exactly as planned, with one structural difference — the abstract base class lives at `app/core/providers/base.py` rather than `app/core/llm_provider.py` for better separation of concerns.
+
+**Files implemented:**
+
+| File | Purpose |
+|---|---|
+| `app/core/providers/base.py` | Abstract `BaseLLMProvider` interface |
+| `app/core/providers/gemini_provider.py` | Gemini implementation with retry logic |
+| `app/core/providers/ollama_provider.py` | Ollama implementation |
+| `app/core/providers/__init__.py` | `get_llm_provider()` factory function |
+| `app/core/config.py` | `LLM_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` settings |
+
+---
+
+### Retry Logic
+
+The `GeminiProvider` implements automatic retry with exponential backoff using `tenacity`:
+- Max attempts: 3
+- Wait: exponential, min 2s, max 10s
+- Handles transient 429 rate limit errors gracefully
+
+---
+
+### Free Tier Observations
+
+The Gemini free tier has per-model daily quotas that vary significantly. New API keys may have zero quota on some models (`gemini-2.0-flash`) while having quota on others (`gemini-2.5-flash`). This is not documented clearly by Google and was discovered through testing.
+
+**Recommendation:** Always test model availability with `provider.is_available()` before assuming a model works on a new API key.
+
+---
+
+### Environment Variable Strategy (as implemented)
+
+```env
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-2.5-flash
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=mistral:7b
+```
+
+---
+
+### Section 6 Correction
+
+The decision table in Section 6 should be read with the following correction:
+
+| Field | Original | Revised |
+|---|---|---|
+| Primary provider model | Gemini 1.5 Flash | `gemini-2.5-flash` |
+| File path for base class | `app/core/llm_provider.py` | `app/core/providers/base.py` |

@@ -358,3 +358,156 @@ The project follows:
 - scalable AI workflows
 - maintainable backend architecture
 - enterprise-grade engineering practices
+
+---
+
+---
+
+# Updates
+
+## Update 1 — Core Architecture Implementation (2026-05-18)
+
+**Status:** Backend foundation implemented and operational.  
+**Last Updated:** 2026-05-18
+
+---
+
+### Implemented Components
+
+The following architectural components are live:
+
+| Component | Status | Technology |
+|---|---|---|
+| API Layer | ✅ Live | FastAPI 0.111.0 + Uvicorn |
+| Config Architecture | ✅ Live | Pydantic Settings + `.env` |
+| Logging | ✅ Live | Loguru |
+| LLM Provider Layer | ✅ Live | Provider abstraction (Strategy Pattern) |
+| Log Ingestion Service | ✅ Live | FastAPI + PostgreSQL |
+| Chunking Service | ✅ Live | LangChain `RecursiveCharacterTextSplitter` |
+| Embedding Layer | ✅ Live | `sentence-transformers` `all-MiniLM-L6-v2` |
+| Vector Database | ✅ Live | ChromaDB (persistent, local) |
+| Relational Database | ✅ Live | PostgreSQL 17 + SQLAlchemy 2.0 + Alembic |
+| Health Check APIs | ✅ Live | `GET /` and `GET /health` |
+| Test Suite | ✅ Live | pytest (25/25 passing) |
+
+---
+
+### Actual Folder Structure (as implemented)
+
+```text
+app/
+│
+├── api/
+│   └── v1/
+│       ├── __init__.py
+│       └── incidents.py        # Incident CRUD + log ingest endpoint
+│
+├── core/
+│   ├── config.py               # Pydantic Settings — loads from .env
+│   ├── database.py             # SQLAlchemy engine, session, health check
+│   ├── logging.py              # Loguru setup
+│   └── providers/
+│       ├── __init__.py         # get_llm_provider() factory
+│       ├── base.py             # BaseLLMProvider abstract interface
+│       ├── gemini_provider.py  # Gemini implementation
+│       └── ollama_provider.py  # Ollama implementation
+│
+├── models/
+│   ├── base.py                 # DeclarativeBase + TimestampMixin
+│   └── incident.py             # Incident model (PostgreSQL table)
+│
+├── schemas/
+│   └── incident.py             # Pydantic request/response schemas
+│
+├── services/
+│   ├── chunking_service.py     # Log chunking pipeline
+│   ├── embedding_service.py    # Embedding generation (sentence-transformers)
+│   ├── incident_service.py     # Incident CRUD business logic
+│   └── vector_store_service.py # ChromaDB operations
+│
+tests/
+│   └── test_core.py            # 25 unit tests (config, providers, endpoints)
+│
+alembic/                        # Database migrations
+main.py                         # FastAPI app entry point
+requirements.txt                # Python dependencies
+.env                            # Environment variables (not committed)
+.env.example                    # Environment variable template (committed)
+pytest.ini                      # Pytest configuration
+```
+
+---
+
+### LLM Provider Architecture (as implemented)
+
+The LLM layer was implemented using the **Strategy Pattern** — a key architectural decision that keeps the platform provider-agnostic.
+
+```text
+RAG Pipeline / Services
+        ↓
+  get_llm_provider()        ← factory function, reads LLM_PROVIDER from .env
+        ↓
+  BaseLLMProvider           ← abstract interface (generate, is_available, provider_name)
+        ↓
+  ┌─────────────────────────────┐
+  │  GeminiProvider             │  ← active (gemini-2.5-flash, free tier)
+  │  OllamaProvider             │  ← available (swap via .env, no code changes)
+  └─────────────────────────────┘
+```
+
+Switching providers requires only:
+```env
+LLM_PROVIDER=ollama   # was: gemini
+```
+
+No application code changes needed.
+
+---
+
+### Database Architecture (as implemented)
+
+**ORM:** SQLAlchemy 2.0 (modern `Mapped` style)  
+**Migrations:** Alembic  
+**Driver:** psycopg2-binary
+
+**Tables live in PostgreSQL:**
+
+| Table | Description |
+|---|---|
+| `incidents` | Core incident records with severity, status, RCA, and raw logs |
+| `alembic_version` | Migration tracking (managed by Alembic) |
+
+**Connection pooling:**
+- Pool size: 5 (configurable via `DATABASE_POOL_SIZE`)
+- Max overflow: 10 (configurable via `DATABASE_MAX_OVERFLOW`)
+- Pool recycle: 1800s (prevents stale connections)
+
+---
+
+### Ingest Pipeline Data Flow (as implemented)
+
+```text
+POST /api/v1/incidents/ingest
+        ↓
+Pydantic validation (LogIngestRequest)
+        ↓
+incident_service.create_incident()  →  PostgreSQL (incidents table)
+        ↓
+chunking_service.chunk_logs()       →  RecursiveCharacterTextSplitter (512 chars, 64 overlap)
+        ↓
+vector_store_service.store_chunks() →  embed_texts() → ChromaDB upsert
+        ↓
+LogIngestResponse (incident_id, message, chunks_created)
+```
+
+---
+
+### Section 4.8 — LLM Layer Correction
+
+The original spec listed `Gemini API` and `OpenAI API` as planned providers. The implemented architecture uses:
+
+- **Active:** Gemini (`gemini-2.5-flash`) via provider abstraction
+- **Available:** Ollama (local LLMs — `mistral:7b`, `llama3.2:3b`)
+- **Future:** OpenAI, Anthropic (add by implementing `BaseLLMProvider`)
+
+OpenAI is not integrated in the current implementation — it has no free tier and the zero-budget constraint is in effect.

@@ -401,3 +401,115 @@ The AI pipeline follows:
 - retrieval-first architecture
 - scalable vector workflows
 - maintainable AI engineering practices
+
+---
+
+---
+
+# Updates
+
+## Update 1 — Pipeline Implementation (2026-05-18)
+
+### Status
+Core AI pipeline implemented and operational.
+
+---
+
+### LLM Provider
+
+The platform uses a **provider abstraction layer** (Strategy Pattern) allowing the LLM backend to be swapped via a single environment variable with no code changes.
+
+**Active provider:** Google Gemini (`gemini-2.5-flash`)
+**Fallback provider:** Ollama (local, offline)
+**Selection:** `LLM_PROVIDER=gemini` or `LLM_PROVIDER=ollama` in `.env`
+
+Provider abstraction is implemented in:
+- `app/core/providers/base.py` — abstract interface
+- `app/core/providers/gemini_provider.py` — Gemini implementation
+- `app/core/providers/ollama_provider.py` — Ollama implementation
+- `app/core/providers/__init__.py` — factory function
+
+---
+
+### Chunking Implementation
+
+**Implemented in:** `app/services/chunking_service.py`
+
+Actual parameters used (refined from initial estimates):
+
+| Parameter | Planned | Implemented |
+|---|---|---|
+| Chunk size | 500–1000 chars | 512 chars |
+| Chunk overlap | 100–200 chars | 64 chars |
+| Splitter | text-based | `RecursiveCharacterTextSplitter` |
+
+**Splitting priority order:** `\n\n` → `\n` → ` ` → `""`
+
+This preserves log line boundaries where possible, preventing mid-line splits on timestamped log entries.
+
+Each chunk is tagged with:
+- `incident_id`
+- `chunk_index`
+- `total_chunks`
+
+---
+
+### Embedding Implementation
+
+**Implemented in:** `app/services/embedding_service.py`
+
+| Parameter | Value |
+|---|---|
+| Model | `all-MiniLM-L6-v2` |
+| Embedding dimensions | 384 |
+| Library | `sentence-transformers==3.0.1` |
+| Model loading | Lazy, cached at module level (loaded once on first use) |
+
+The model is loaded once at startup and reused across all requests — avoids the ~5 second load time on every request.
+
+---
+
+### Vector Store Implementation
+
+**Implemented in:** `app/services/vector_store_service.py`
+
+| Parameter | Value |
+|---|---|
+| Database | ChromaDB (persistent) |
+| Collection | `incident_logs` |
+| Similarity metric | Cosine similarity |
+| Persistence path | `./data/chroma` (configurable via `CHROMA_PERSIST_DIR`) |
+| Telemetry | Disabled (`anonymized_telemetry=False`) |
+
+**Key operations implemented:**
+- `store_chunks()` — batch embed and upsert chunks
+- `query_similar_chunks()` — semantic search with optional incident-level filtering
+- `delete_incident_chunks()` — cleanup on incident deletion
+
+Chunk IDs follow the format: `{incident_id}_chunk_{index}`
+
+---
+
+### Full Ingest Pipeline Flow (as implemented)
+
+```text
+POST /api/v1/incidents/ingest
+    ↓
+Validate request (Pydantic)
+    ↓
+Create incident record (PostgreSQL)
+    ↓
+chunk_logs() — RecursiveCharacterTextSplitter
+    ↓
+store_chunks() — embed_texts() → ChromaDB upsert
+    ↓
+Return incident_id + chunks_created
+```
+
+All four steps run synchronously within a single API request. Async processing is planned for Phase 2 when log volumes grow.
+
+---
+
+### Notes
+- ChromaDB telemetry warnings (`capture() takes 1 positional argument`) are a known harmless issue with the ChromaDB version in use and do not affect functionality.
+- The embedding model (`all-MiniLM-L6-v2`, ~90MB) is downloaded from HuggingFace on first run and cached locally.

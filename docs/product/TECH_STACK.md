@@ -447,3 +447,127 @@ The goal is to build:
 - a production-style AI platform
 rather than
 - a notebook-based AI demo project.
+
+---
+
+---
+
+# Updates
+
+## Update 1 — Stack Implementation (2026-05-18)
+
+**Status:** Core stack implemented and operational.  
+**Last Updated:** 2026-05-18
+
+---
+
+### Implemented Technologies (with actual versions)
+
+| Technology | Version | Status |
+|---|---|---|
+| Python | 3.11.9 | ✅ Active |
+| FastAPI | 0.111.0 | ✅ Active |
+| Uvicorn | 0.29.0 | ✅ Active |
+| Pydantic | 2.7.1 | ✅ Active |
+| Pydantic Settings | 2.2.1 | ✅ Active |
+| SQLAlchemy | 2.0.30 | ✅ Active |
+| Alembic | 1.13.1 | ✅ Active |
+| psycopg2-binary | 2.9.9 | ✅ Active |
+| PostgreSQL | 17.10.1 | ✅ Active |
+| ChromaDB | 0.5.3 | ✅ Active |
+| sentence-transformers | 3.0.1 | ✅ Active |
+| google-generativeai | 0.7.2 | ✅ Active |
+| langchain | 0.2.5 | ✅ Active |
+| langchain-community | 0.2.5 | ✅ Active |
+| langchain-google-genai | 1.0.7 | ✅ Active |
+| langchain-text-splitters | 0.2.4 | ✅ Active |
+| ollama | 0.2.1 | ✅ Available (fallback) |
+| loguru | 0.7.2 | ✅ Active |
+| tenacity | 8.3.0 | ✅ Active |
+| httpx | 0.27.0 | ✅ Active |
+| pytest | 8.2.2 | ✅ Active |
+| pytest-asyncio | 0.23.7 | ✅ Active |
+| python-dotenv | 1.0.1 | ✅ Active |
+
+---
+
+### Section 3.3 — LLM Stack Revision
+
+The original spec described a simple Gemini/OpenAI selection. The implemented architecture uses a **provider abstraction layer** (Strategy Pattern) that makes the LLM backend fully swappable via environment variable.
+
+**Active model:** `gemini-2.5-flash` (free tier)
+
+Models tested during setup:
+
+| Model | Outcome |
+|---|---|
+| `gemini-1.5-flash` | 404 — unavailable on API version v1beta |
+| `gemini-2.0-flash` | 429 — daily quota is 0 on free tier |
+| `gemini-2.0-flash-lite` | 429 — daily quota is 0 on free tier |
+| `gemini-2.5-flash` | ✅ Working — selected as active model |
+
+**OpenAI** is not integrated — it has no free tier and the zero-budget constraint is in effect.
+
+---
+
+### Section 3.2 — Sentence Transformers (as implemented)
+
+| Parameter | Value |
+|---|---|
+| Model | `all-MiniLM-L6-v2` |
+| Embedding dimensions | 384 |
+| Inference | Local CPU (no GPU required) |
+| Model size | ~90MB (downloaded once, cached by HuggingFace) |
+| Loading strategy | Lazy init, cached at module level |
+
+---
+
+### Section 4.2 — ChromaDB (as implemented)
+
+| Parameter | Value |
+|---|---|
+| Mode | Persistent (disk-backed) |
+| Persist directory | `./data/chroma` (configurable) |
+| Collection | `incident_logs` |
+| Similarity metric | Cosine similarity (`hnsw:space=cosine`) |
+| Telemetry | Disabled (`anonymized_telemetry=False`) |
+
+---
+
+### Section 4.1 — PostgreSQL (as implemented)
+
+| Parameter | Value |
+|---|---|
+| Version | 17.10.1 |
+| ORM | SQLAlchemy 2.0 (modern `Mapped` column style) |
+| Migrations | Alembic |
+| Driver | psycopg2-binary |
+| Pool size | 5 (configurable) |
+| Max overflow | 10 (configurable) |
+| Pool recycle | 1800s |
+
+**Live tables:**
+- `incidents` — core incident records
+- `alembic_version` — migration tracking
+
+---
+
+### New Technology Additions (Not in Original Spec)
+
+| Technology | Purpose | Why Added |
+|---|---|---|
+| Alembic | Database migrations | Production-grade schema management |
+| Loguru | Structured logging | Cleaner than Python's built-in `logging` |
+| Tenacity | Retry logic | Handles Gemini API transient failures gracefully |
+| pytest-asyncio | Async test support | Required for testing async FastAPI endpoints |
+
+---
+
+### Dependency Conflict Notes
+
+During setup, the following version conflict was encountered and resolved:
+
+- `langchain-google-genai` has strict version requirements on `google-generativeai`
+- Resolution: `google-generativeai==0.7.2` + `langchain-google-genai==1.0.7` are compatible
+
+If reinstalling from scratch, use the pinned versions in `requirements.txt` exactly.

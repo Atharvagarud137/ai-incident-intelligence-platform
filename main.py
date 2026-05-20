@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1.query import router as query_router
 
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 
 app.include_router(incidents_router, prefix="/api/v1")
+app.include_router(query_router, prefix="/api/v1")
 
 @app.get("/", tags=["Health"])
 async def root():

@@ -1,0 +1,30 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Environment
+.env
+
+# Data & logs (generated at runtime)
+data/
+logs/
+
+# Git
+.git/
+.gitignore
+
+# Tests
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

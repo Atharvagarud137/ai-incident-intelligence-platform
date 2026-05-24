@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    container_name: incident_platform_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: incident_platform
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # FastAPI backend
+  api:
+    build: .
+    container_name: incident_platform_api
+    env_file:
+      - .env
+    environment:
+      # Override DATABASE_URL to point to the postgres service container
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/incident_platform
+    volumes:
+      # Persist ChromaDB data and logs outside the container
+      - chroma_data:/app/data/chroma
+      - logs_data:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  postgres_data:
+  chroma_data:
+  logs_data:

@@ -6,7 +6,7 @@ An enterprise-grade AI platform for DevOps and SRE teams that ingests operationa
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)
 ![ChromaDB](https://img.shields.io/badge/ChromaDB-0.5.3-orange)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue)
-![Tests](https://img.shields.io/badge/Tests-25%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-59%20passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---

@@ -19,3 +19,5 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+test_temp.db

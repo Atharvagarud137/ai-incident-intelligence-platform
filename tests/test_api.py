@@ -14,19 +14,17 @@ from app.models.incident import IncidentSeverity, IncidentStatus
 # Shared Test Database Setup
 # =============================================================================
 
-# Module-level shared engine — all tests in this file use the same DB
+TEST_DB_PATH = "./test_temp.db"
+TEST_DB_URL = f"sqlite:///{TEST_DB_PATH}"
+
 TEST_ENGINE = create_engine(
-    "sqlite:///:memory:",
+    TEST_DB_URL,
     connect_args={"check_same_thread": False}
 )
 TestSession = sessionmaker(bind=TEST_ENGINE)
 
 
 def get_test_db():
-    """
-    Returns a session backed by the shared in-memory SQLite engine.
-    All requests within a test see the same data.
-    """
     session = TestSession()
     try:
         yield session
@@ -36,15 +34,12 @@ def get_test_db():
 
 @pytest.fixture(autouse=True)
 def override_db():
-    """
-    Creates tables before each test and drops them after.
-    Ensures complete isolation between tests while sharing the engine.
-    """
     Base.metadata.create_all(TEST_ENGINE)
     app.dependency_overrides[get_db] = get_test_db
     yield
     app.dependency_overrides.clear()
     Base.metadata.drop_all(TEST_ENGINE)
+
 
 
 # =============================================================================
